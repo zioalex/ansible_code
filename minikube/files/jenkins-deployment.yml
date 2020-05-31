@@ -1,0 +1,66 @@
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: pv0001
+spec:
+  accessModes:
+    - ReadWriteOnce
+  capacity:
+    storage: 1Gi
+  hostPath:
+    path: /data/pv0001/
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: pv0001
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: jenkins-deployment
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: jenkins
+  template:
+    metadata:
+      labels:
+        app: jenkins
+        version: "1"
+    spec:
+      containers:
+      - name: jenkins
+        image: zioalex/jenkins-automated-setup
+        imagePullPolicy: Never
+        ports:
+        - containerPort: 8080
+        env:
+        - name: DOCKER_TLS_VERIFY
+          value: "1"
+        - name: DOCKER_HOST
+          value: tcp://172.17.0.3:2376 # find a good way to get this dinamically
+        volumeMounts:
+          - name: jenkins-home
+            mountPath: /var/jenkins_home
+            subPath: jenkins_home
+          - name: docker-certs
+            mountPath: /var/jenkins_home/.docker
+            #mountPath: /var/jenkins_home/.docker
+            #subPath: jenkins_home/.docker/certs
+            readOnly: true
+      volumes:
+        - name: jenkins-home
+          persistentVolumeClaim:
+            claimName: pv0001
+        - name: docker-certs
+          secret:
+            secretName: docker-certs

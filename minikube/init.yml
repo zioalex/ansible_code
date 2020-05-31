@@ -1,0 +1,13 @@
+- hosts: localhost
+
+  vars_files:
+    - setup_vars.yml
+
+  tasks:
+    - block:
+
+      - name: start the cluster
+        shell: minikube start -p {{ cluster_name }}
+        become: true
+
+

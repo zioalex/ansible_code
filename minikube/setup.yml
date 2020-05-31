@@ -1,0 +1,113 @@
+- hosts: localhost
+
+  vars_files:
+    -  setup_vars.yml
+
+  tasks:
+
+  - block:
+
+    - name: Install required apt packages
+      apt:
+        name: "{{item}}"
+      become: true
+      with_items: "{{ apt_packages }}"
+
+    - name: Start and Enable docker service
+      shell: systemctl enable docker; systemctl start docker
+      args:
+        executable:  /bin/bash
+      register: docker_enable
+      become: true
+
+    - name: check docker service status
+      shell:  systemctl status docker
+      args: 
+        executable: /bin/bash
+      register: docker_status
+      become: true
+      until: "'active' and 'running' in docker_status.stdout"
+      delay: 30
+      retries: 5 
+
+    - name: Download and install required  curl packages
+      shell: curl {{ item }}
+      args:
+        executable:  /bin/bash
+      become: true
+      with_items: "{{ curl_packages }}"
+
+    - name: Change file permissions
+      shell: chmod +x minikube kubectl
+      become: true
+
+    - name: Move to the bin folder
+      shell:  mv minikube kubectl /usr/local/bin/
+      become: true
+
+    - name: Setup the directory for storing Minikube and kubectl configuration.
+      shell: mkdir $HOME/.kube || true
+
+    - name: Create empty file(config) under directory.
+      shell: touch $HOME/.kube/config
+
+      #    - name: copy these configuration line
+      #shell: |
+      #  echo "export MINIKUBE_WANTUPDATENOTIFICATION=false" >> ~/.profile,
+      #  echo "export MINIKUBE_WANTREPORTERRORPROMPT=false" >> ~/.profile
+      #  echo "export MINIKUBE_HOME=$HOME" >> ~/.profile
+      #  echo "export CHANGE_MINIKUBE_NONE_USER=true" >> ~/.profile
+      #  echo "export KUBECONFIG=$HOME/.kube/config" >> ~/.profile
+
+    - name: Start Minikube with option vm-driver=docker
+      shell: minikube start -p {{ cluster_name }} --vm-driver=docker --insecure-registry "10.0.0.0/24"
+      args:
+        executable: /bin/bash
+
+    - name: After minikube configuration, we check minikube status
+      shell: minikube status -p {{ cluster_name }}
+      args:
+        executable: /bin/bash
+      register: minikube_status
+      until: "'minikube' and 'Running' in minikube_status.stdout"
+      delay: 30
+      retries: 10
+
+    - name: Build the custom Jenkins image
+      shell: |
+        eval "$(minikube docker-env -p {{ cluster_name }})"
+        cd ~/service/ansible_code/docker/jenkins
+        make build 
+      args:
+        executable: /bin/bash
+
+    - name: start Jenkins
+      shell: |
+        eval "$(minikube docker-env -p {{ cluster_name }})"
+        kubectl create namespace jenkins
+        cd ~/service/ansible_code/minikube
+        kubectl apply -f files/jenkins-deployment.yml --namespace jenkins
+        kubectl apply -f files/jenkins-service.yml --namespace jenkins
+      args:
+        executable: /bin/bash
+
+    - name: Create DOCKER_HOST secrets in Jenkins
+      shell: |
+        eval "$(minikube docker-env -p {{ cluster_name }})"
+        cd ~/service/ansible_code/minikube/files
+        [ ! -d certs ] && mkdir certs
+        cp -R ${DOCKER_CERT_PATH}/* ./certs
+        kubectl -n jenkins apply -k .
+      args:
+        executable: /bin/bash
+
+    - name: Restore Jobs
+      shell: |
+        cd ~/service/ansible_code/docker/jenkins
+        wget 172.17.0.3:30000/jnlpJars/jenkins-cli.jar
+        java -jar jenkins-cli.jar -s http://admin:admin@172.17.0.3:30000 create-job hello_world < hello_world.job
+        java -jar jenkins-cli.jar -s http://admin:admin@172.17.0.3:30000 create-job create_app_container < create_app_container.job
+        java -jar jenkins-cli.jar -s http://admin:admin@172.17.0.3:30000 create-job hello_world_test < hello_world_test.job
+      args:
+        executable: /bin/bash
+
