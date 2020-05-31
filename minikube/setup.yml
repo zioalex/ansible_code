@@ -73,6 +73,14 @@
       delay: 30
       retries: 10
 
+    - name: Create embedded kubeconfig
+      shell: |
+        eval "$(minikube docker-env -p {{ cluster_name }})"
+        kubectl config set-cluster Newyorker --server https://172.17.0.3:8443 --certificate-authority=/home/vagrant/.minikube/ca.crt  --embed-certs=true --kubeconfig minikube/files/kubeconfig_embed
+        kubectl config set-credentials Newyorker --client-certificate=/home/vagrant/.minikube/profiles/Newyorker/client.crt --client-key=/home/vagrant/.minikube/profiles/Newyorker/client.key  --embed-certs=true --kubeconfig minikube/files/kubeconfig_embed
+        kubectl config set-context Newyorker --cluster=Newyorker --user=Newyorker --kubeconfig  minikube/files/kubeconfig_embed
+        kubectl config use-context Newyorker --kubeconfig minikube/files/kubeconfig_embed
+
     - name: Build the custom Jenkins image
       shell: |
         eval "$(minikube docker-env -p {{ cluster_name }})"
@@ -91,7 +99,8 @@
       args:
         executable: /bin/bash
 
-    - name: Create DOCKER_HOST secrets in Jenkins
+    - name: Create DOCKER_HOST secrets and ConfigMaps in Jenkins
+      # Needed to be able to build docker Images and push to the minikube docker registry
       shell: |
         eval "$(minikube docker-env -p {{ cluster_name }})"
         cd ~/service/ansible_code/minikube/files
@@ -100,14 +109,21 @@
         kubectl -n jenkins apply -k .
       args:
         executable: /bin/bash
+    
+    - name: Create Jenkins Secrets
+      shell: |
+        cd ~/service/ansible_code/minikube/files
+        wget -nc 172.17.0.3:30000/jnlpJars/jenkins-cli.jar
+        java -jar jenkins-cli.jar  -s http://admin:admin@172.17.0.3:30000 create-credentials-by-xml system::system::jenkins _ < kube-config-secrets.xml
 
     - name: Restore Jobs
       shell: |
         cd ~/service/ansible_code/docker/jenkins
-        wget 172.17.0.3:30000/jnlpJars/jenkins-cli.jar
+        wget -nc 172.17.0.3:30000/jnlpJars/jenkins-cli.jar
         java -jar jenkins-cli.jar -s http://admin:admin@172.17.0.3:30000 create-job hello_world < hello_world.job
         java -jar jenkins-cli.jar -s http://admin:admin@172.17.0.3:30000 create-job create_app_container < create_app_container.job
         java -jar jenkins-cli.jar -s http://admin:admin@172.17.0.3:30000 create-job hello_world_test < hello_world_test.job
+        java -jar jenkins-cli.jar -s http://admin:admin@172.17.0.3:30000 create-job deploy_to_k8s < deploy_to_k8s.job
       args:
         executable: /bin/bash
 

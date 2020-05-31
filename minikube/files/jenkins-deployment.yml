@@ -57,6 +57,11 @@ spec:
             #mountPath: /var/jenkins_home/.docker
             #subPath: jenkins_home/.docker/certs
             readOnly: true
+          - name: application-deployment
+            mountPath: /var/jenkins_home/app-deployments.yml
+          - name: kube-config
+            mountPath: /var/jenkins_home/kube_config
+
       volumes:
         - name: jenkins-home
           persistentVolumeClaim:
@@ -64,3 +69,9 @@ spec:
         - name: docker-certs
           secret:
             secretName: docker-certs
+        - name: application-deployment
+          configMap: 
+            name: app-deployments.yml
+        - name: kube-config
+          configMap:
+            name: kubeconfig-embed

@@ -9,3 +9,10 @@ secretGenerator:
   - certs/ca.pem
   - certs/cert.pem    
   - certs/key.pem
+configMapGenerator:
+- name: app-deployments.yml
+  files:
+  - app-deployments.yml
+- name: kubeconfig-embed
+  files:
+  - kubeconfig_embed
