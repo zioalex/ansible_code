@@ -9,6 +9,6 @@ curl_packages:
     - -Lo kubectl https://storage.googleapis.com/kubernetes-release/release/$(curl -s https://storage.googleapis.com/kubernetes-release/release/stable.txt)/bin/linux/amd64/kubectl
 
 
-cluster_name: Newyorker
+cluster_name: Newyork
 
 
