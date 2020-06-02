@@ -102,6 +102,15 @@
       args:
         executable: /bin/bash
     
+    # restore step 
+    - name: Create Jenkins Secrets
+      shell: |
+        export LOCAL_K8S_IP="$(minikube docker-env -p {{ cluster_name }} | grep -oh -E '[0-9]*\.[0-9]*\.[0-9]*\.[0-9]*')"
+        cd ~/service/ansible_code/minikube/files
+        sleep 120 # Wait for Jenkins to be ready
+        wget -nc ${LOCAL_K8S_IP}:30000/jnlpJars/jenkins-cli.jar
+        java -jar jenkins-cli.jar  -s http://admin:admin@$LOCAL_K8S_IP:30000 create-credentials-by-xml system::system::jenkins _ < kube-config-secrets.xml
+
     - name: Restore Jobs
       shell: |
         cd ~/service/ansible_code/docker/jenkins
@@ -114,11 +123,3 @@
       args:
         executable: /bin/bash
 
-    # For some, still unknown, reason this fail with connection refused if put before the
-    # restore step 
-    - name: Create Jenkins Secrets
-      shell: |
-        export LOCAL_K8S_IP="$(minikube docker-env -p {{ cluster_name }} | grep -oh -E '[0-9]*\.[0-9]*\.[0-9]*\.[0-9]*')"
-        cd ~/service/ansible_code/minikube/files
-        wget -nc ${LOCAL_K8S_IP}:30000/jnlpJars/jenkins-cli.jar
-        java -jar jenkins-cli.jar  -s http://admin:admin@$LOCAL_K8S_IP:30000 create-credentials-by-xml system::system::jenkins _ < kube-config-secrets.xml
