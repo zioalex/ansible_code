@@ -68,10 +68,11 @@
     - name: Create embedded kubeconfig
       shell: |
         eval "$(minikube docker-env -p {{ cluster_name }})"
-        kubectl config set-cluster Newyorker --server https://172.17.0.3:8443 --certificate-authority=/home/vagrant/.minikube/ca.crt  --embed-certs=true --kubeconfig files/kubeconfig_embed
-        kubectl config set-credentials Newyorker --client-certificate=/home/vagrant/.minikube/profiles/Newyorker/client.crt --client-key=/home/vagrant/.minikube/profiles/Newyorker/client.key  --embed-certs=true --kubeconfig files/kubeconfig_embed
-        kubectl config set-context Newyorker --cluster=Newyorker --user=Newyorker --kubeconfig  files/kubeconfig_embed
-        kubectl config use-context Newyorker --kubeconfig files/kubeconfig_embed
+        export LOCAL_K8S_IP="$(minikube docker-env -p {{ cluster_name }} | grep -oh -E '[0-9]*\.[0-9]*\.[0-9]*\.[0-9]*')"
+        kubectl config set-cluster {{ cluster_name }} --server https://$LOCAL_K8S_IP:8443 --certificate-authority=/home/vagrant/.minikube/ca.crt  --embed-certs=true --kubeconfig files/kubeconfig_embed
+        kubectl config set-credentials {{ cluster_name }} --client-certificate=/home/vagrant/.minikube/profiles/{{ cluster_name }}/client.crt --client-key=/home/vagrant/.minikube/profiles/{{ cluster_name }}/client.key  --embed-certs=true --kubeconfig files/kubeconfig_embed
+        kubectl config set-context {{ cluster_name }} --cluster={{ cluster_name }} --user={{ cluster_name }} --kubeconfig  files/kubeconfig_embed
+        kubectl config use-context {{ cluster_name }} --kubeconfig files/kubeconfig_embed
 
     - name: Build the custom Jenkins image
       shell: |
